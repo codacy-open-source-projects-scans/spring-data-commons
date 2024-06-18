@@ -66,8 +66,6 @@ import org.springframework.lang.Nullable;
 import org.springframework.transaction.interceptor.TransactionalProxy;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
-import org.springframework.util.ConcurrentReferenceHashMap;
-import org.springframework.util.ConcurrentReferenceHashMap.ReferenceType;
 import org.springframework.util.ObjectUtils;
 
 /**
@@ -110,7 +108,7 @@ public abstract class RepositoryFactorySupport implements BeanClassLoaderAware, 
 	@SuppressWarnings("null")
 	public RepositoryFactorySupport() {
 
-		this.repositoryInformationCache = new ConcurrentReferenceHashMap<>(16, ReferenceType.WEAK);
+		this.repositoryInformationCache = new HashMap<>(16);
 		this.postProcessors = new ArrayList<>();
 
 		this.repositoryBaseClass = Optional.empty();
@@ -366,8 +364,7 @@ public abstract class RepositoryFactorySupport implements BeanClassLoaderAware, 
 
 		if (logger.isDebugEnabled()) {
 			logger
-					.debug(LogMessage.format("Finished creation of repository instance for %s.",
-				repositoryInterface.getName()));
+					.debug(LogMessage.format("Finished creation of repository instance for %s.", repositoryInterface.getName()));
 		}
 
 		return repository;
@@ -442,12 +439,15 @@ public abstract class RepositoryFactorySupport implements BeanClassLoaderAware, 
 
 		RepositoryInformationCacheKey cacheKey = new RepositoryInformationCacheKey(metadata, composition);
 
-		return repositoryInformationCache.computeIfAbsent(cacheKey, key -> {
+		synchronized (repositoryInformationCache) {
 
-			Class<?> baseClass = repositoryBaseClass.orElse(getRepositoryBaseClass(metadata));
+			return repositoryInformationCache.computeIfAbsent(cacheKey, key -> {
 
-			return new DefaultRepositoryInformation(metadata, baseClass, composition);
-		});
+				Class<?> baseClass = repositoryBaseClass.orElse(getRepositoryBaseClass(metadata));
+
+				return new DefaultRepositoryInformation(metadata, baseClass, composition);
+			});
+		}
 	}
 
 	protected List<QueryMethod> getQueryMethods() {
@@ -727,7 +727,7 @@ public abstract class RepositoryFactorySupport implements BeanClassLoaderAware, 
 	 */
 	static class RepositoryValidator {
 
-		static Map<Class<?>, String> WELL_KNOWN_EXECUTORS = new HashMap<>();
+		static Map<Class<?>, String> WELL_KNOWN_EXECUTORS = new HashMap<>(4, 1.0f);
 
 		static {
 
@@ -788,11 +788,9 @@ public abstract class RepositoryFactorySupport implements BeanClassLoaderAware, 
 				}
 
 				if (!containsFragmentImplementation(composition, executorInterface)) {
-					throw new UnsupportedFragmentException(
-							String.format("Repository %s implements %s but %s does not support %s",
-									ClassUtils.getQualifiedName(repositoryInterface), ClassUtils.getQualifiedName(executorInterface),
-									ClassUtils.getShortName(source), entry.getValue()),
-							repositoryInterface, executorInterface);
+					throw new UnsupportedFragmentException(String.format("Repository %s implements %s but %s does not support %s",
+							ClassUtils.getQualifiedName(repositoryInterface), ClassUtils.getQualifiedName(executorInterface),
+							ClassUtils.getShortName(source), entry.getValue()), repositoryInterface, executorInterface);
 				}
 			}
 		}
