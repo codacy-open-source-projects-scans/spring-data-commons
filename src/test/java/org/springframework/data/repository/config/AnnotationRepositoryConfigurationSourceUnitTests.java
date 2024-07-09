@@ -15,8 +15,9 @@
  */
 package org.springframework.data.repository.config;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.mockito.Mockito.mock;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -24,7 +25,9 @@ import java.lang.annotation.RetentionPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.context.annotation.ComponentScan.Filter;
+import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGenerator;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.StandardEnvironment;
@@ -33,6 +36,10 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.core.type.StandardAnnotationMetadata;
 import org.springframework.data.repository.PagingAndSortingRepository;
+import org.springframework.data.repository.config.basepackage.repo.PersonRepository;
+import org.springframework.data.repository.core.support.DummyReactiveRepositoryFactory;
+import org.springframework.data.repository.core.support.DummyRepositoryFactory;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 
 /**
  * Unit tests for {@link AnnotationRepositoryConfigurationSource}.
@@ -40,6 +47,7 @@ import org.springframework.data.repository.PagingAndSortingRepository;
  * @author Oliver Gierke
  * @author Thomas Darimont
  * @author Mark Paluch
+ * @author Christoph Strobl
  */
 class AnnotationRepositoryConfigurationSourceUnitTests {
 
@@ -165,6 +173,28 @@ class AnnotationRepositoryConfigurationSourceUnitTests {
 				.isThrownBy(() -> source.getRequiredAttribute("namedQueriesLocation", String.class));
 	}
 
+	@Test // GH-3082
+	void considerBeanNameGenerator() {
+
+		RootBeanDefinition bd = new RootBeanDefinition(DummyRepositoryFactory.class);
+		bd.getConstructorArgumentValues().addGenericArgumentValue(PersonRepository.class);
+
+		assertThat(getConfigSource(ConfigurationWithBeanNameGenerator.class).generateBeanName(bd))
+				.isEqualTo("org.springframework.data.repository.config.basepackage.repo.PersonRepository");
+		assertThat(getConfigSource(DefaultConfiguration.class).generateBeanName(bd)).isEqualTo("personRepository");
+	}
+
+	@Test // GH-3082
+	void considerBeanNameGeneratorForReactiveRepos() {
+
+		RootBeanDefinition bd = new RootBeanDefinition(DummyReactiveRepositoryFactory.class);
+		bd.getConstructorArgumentValues().addGenericArgumentValue(ReactivePersonRepository.class);
+
+		assertThat(getConfigSource(ConfigurationWithBeanNameGenerator.class).generateBeanName(bd))
+			.isEqualTo(ReactivePersonRepository.class.getName());
+		assertThat(getConfigSource(DefaultConfiguration.class).generateBeanName(bd)).isEqualTo("annotationRepositoryConfigurationSourceUnitTests.ReactivePersonRepository");
+	}
+
 	private AnnotationRepositoryConfigurationSource getConfigSource(Class<?> type) {
 
 		AnnotationMetadata metadata = new StandardAnnotationMetadata(type, true);
@@ -186,6 +216,12 @@ class AnnotationRepositoryConfigurationSourceUnitTests {
 	@EnableRepositories(excludeFilters = { @Filter(Primary.class) })
 	static class ConfigurationWithExplicitFilter {}
 
+	@EnableRepositories(nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class)
+	static class ConfigurationWithBeanNameGenerator {}
+
+	@EnableReactiveRepositories(nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class)
+	static class ReactiveConfigurationWithBeanNameGenerator {}
+
 	@Retention(RetentionPolicy.RUNTIME)
 	@interface SampleAnnotation {
 
@@ -196,4 +232,6 @@ class AnnotationRepositoryConfigurationSourceUnitTests {
 
 	@SampleAnnotation
 	static class ConfigWithSampleAnnotation {}
+
+	interface ReactivePersonRepository extends ReactiveCrudRepository<Person, String> {}
 }

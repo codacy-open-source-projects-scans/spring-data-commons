@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanNameGenerator;
 import org.springframework.context.annotation.AnnotationBeanNameGenerator;
@@ -52,6 +53,7 @@ import org.springframework.util.StringUtils;
  * @author Mark Paluch
  * @author Johannes Englmeier
  * @author Florian Cramer
+ * @author Christoph Strobl
  */
 public class AnnotationRepositoryConfigurationSource extends RepositoryConfigurationSourceSupport {
 
@@ -64,6 +66,9 @@ public class AnnotationRepositoryConfigurationSource extends RepositoryConfigura
 	private static final String REPOSITORY_BASE_CLASS = "repositoryBaseClass";
 	private static final String CONSIDER_NESTED_REPOSITORIES = "considerNestedRepositories";
 	private static final String BOOTSTRAP_MODE = "bootstrapMode";
+	private static final String BEAN_NAME_GENERATOR = "nameGenerator";
+	private static final String INCLUDE_FILTERS = "includeFilters";
+	private static final String EXCLUDE_FILTERS = "excludeFilters";
 
 	private final AnnotationMetadata configMetadata;
 	private final AnnotationMetadata enableAnnotationMetadata;
@@ -97,14 +102,15 @@ public class AnnotationRepositoryConfigurationSource extends RepositoryConfigura
 	 * @param resourceLoader must not be {@literal null}.
 	 * @param environment must not be {@literal null}.
 	 * @param registry must not be {@literal null}.
-	 * @param generator can be {@literal null}.
+	 * @param importBeanNameGenerator can be {@literal null}.
 	 */
 	public AnnotationRepositoryConfigurationSource(AnnotationMetadata metadata, Class<? extends Annotation> annotation,
 			ResourceLoader resourceLoader, Environment environment, BeanDefinitionRegistry registry,
-			@Nullable BeanNameGenerator generator) {
+			@Nullable BeanNameGenerator importBeanNameGenerator) {
 
 		super(environment, ConfigurationUtils.getRequiredClassLoader(resourceLoader), registry,
-				defaultBeanNameGenerator(generator));
+				configuredOrDefaultBeanNameGenerator(metadata, annotation,
+						ConfigurationUtils.getRequiredClassLoader(resourceLoader), importBeanNameGenerator));
 
 		Assert.notNull(metadata, "Metadata must not be null");
 		Assert.notNull(annotation, "Annotation must not be null");
@@ -172,12 +178,12 @@ public class AnnotationRepositoryConfigurationSource extends RepositoryConfigura
 
 	@Override
 	protected Iterable<TypeFilter> getIncludeFilters() {
-		return parseFilters("includeFilters");
+		return parseFilters(INCLUDE_FILTERS);
 	}
 
 	@Override
 	public Streamable<TypeFilter> getExcludeFilters() {
-		return parseFilters("excludeFilters");
+		return parseFilters(EXCLUDE_FILTERS);
 	}
 
 	@Override
@@ -301,8 +307,21 @@ public class AnnotationRepositoryConfigurationSource extends RepositoryConfigura
 	 */
 	private static boolean hasExplicitFilters(AnnotationAttributes attributes) {
 
-		return Stream.of("includeFilters", "excludeFilters") //
+		return Stream.of(INCLUDE_FILTERS, EXCLUDE_FILTERS) //
 				.anyMatch(it -> attributes.getAnnotationArray(it).length > 0);
+	}
+
+	private static BeanNameGenerator configuredOrDefaultBeanNameGenerator(AnnotationMetadata metadata,
+			Class<? extends Annotation> annotation, ClassLoader beanClassLoader,
+			@Nullable BeanNameGenerator importBeanNameGenerator) {
+
+		BeanNameGenerator beanNameGenerator = getConfiguredBeanNameGenerator(metadata, annotation, beanClassLoader);
+
+		if (beanNameGenerator != null) {
+			return beanNameGenerator;
+		}
+
+		return defaultBeanNameGenerator(importBeanNameGenerator);
 	}
 
 	/**
@@ -312,13 +331,52 @@ public class AnnotationRepositoryConfigurationSource extends RepositoryConfigura
 	 * customized.
 	 *
 	 * @param generator can be {@literal null}.
-	 * @return
+	 * @return the configured {@link BeanNameGenerator} if it is not
+	 *         {@link ConfigurationClassPostProcessor#IMPORT_BEAN_NAME_GENERATOR} or {@link AnnotationBeanNameGenerator}
+	 *         otherwise.
 	 * @since 2.2
 	 */
 	private static BeanNameGenerator defaultBeanNameGenerator(@Nullable BeanNameGenerator generator) {
 
 		return generator == null || ConfigurationClassPostProcessor.IMPORT_BEAN_NAME_GENERATOR.equals(generator) //
-				? new AnnotationBeanNameGenerator() //
+				? AnnotationBeanNameGenerator.INSTANCE //
 				: generator;
+	}
+
+	/**
+	 * Obtain a configured {@link BeanNameGenerator} if present.
+	 *
+	 * @param beanClassLoader a class loader to load the configured {@link BeanNameGenerator} class in case it was
+	 *          configured as String instead of a Class instance.
+	 * @return the bean name generator or {@literal null} if not configured.
+	 */
+	@Nullable
+	@SuppressWarnings("unchecked")
+	private static BeanNameGenerator getConfiguredBeanNameGenerator(AnnotationMetadata metadata,
+		Class<? extends Annotation> annotation, ClassLoader beanClassLoader) {
+
+		Map<String, Object> annotationAttributes = metadata.getAnnotationAttributes(annotation.getName());
+		if(annotationAttributes == null || !annotationAttributes.containsKey(BEAN_NAME_GENERATOR)) {
+			return null;
+		}
+
+		Object configuredBeanNameGenerator = annotationAttributes.get(BEAN_NAME_GENERATOR);
+		if (configuredBeanNameGenerator == null) {
+			return null;
+		}
+
+		if (configuredBeanNameGenerator instanceof String beanNameGeneratorTypeName) {
+			try {
+				configuredBeanNameGenerator = ClassUtils.forName(beanNameGeneratorTypeName, beanClassLoader);
+			} catch (Exception o_O) {
+				throw new RuntimeException(o_O);
+			}
+		}
+
+		if (configuredBeanNameGenerator != BeanNameGenerator.class) {
+			return BeanUtils.instantiateClass((Class<? extends BeanNameGenerator>) configuredBeanNameGenerator);
+		}
+
+		return null;
 	}
 }
