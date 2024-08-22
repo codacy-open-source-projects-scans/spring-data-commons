@@ -52,8 +52,7 @@ class RepositoryCompositionUnitTests {
 		RepositoryInformation repositoryInformation = new DefaultRepositoryInformation(
 				new DefaultRepositoryMetadata(PersonRepository.class), backingRepo.getClass(), RepositoryComposition.empty());
 
-		var mixin = RepositoryFragment.implemented(QueryByExampleExecutor.class,
-				queryByExampleExecutor);
+		var mixin = RepositoryFragment.implemented(QueryByExampleExecutor.class, queryByExampleExecutor);
 
 		var base = RepositoryFragment.implemented(backingRepo);
 
@@ -139,8 +138,7 @@ class RepositoryCompositionUnitTests {
 
 		assertThatExceptionOfType(FragmentNotImplementedException.class) //
 				.isThrownBy(mixed::validateImplementation) //
-				.withMessageContaining(
-						"Fragment org.springframework.data.repository.query.QueryByExampleExecutor")
+				.withMessageContaining("Fragment org.springframework.data.repository.query.QueryByExampleExecutor")
 				.withMessageContaining("has no implementation");
 	}
 

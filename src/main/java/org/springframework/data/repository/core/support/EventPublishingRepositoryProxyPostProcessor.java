@@ -29,6 +29,7 @@ import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.AfterDomainEventPublication;
 import org.springframework.data.domain.DomainEvents;
+import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.core.RepositoryInformation;
 import org.springframework.data.util.AnnotationDetectionMethodCallback;
 import org.springframework.lang.Nullable;
