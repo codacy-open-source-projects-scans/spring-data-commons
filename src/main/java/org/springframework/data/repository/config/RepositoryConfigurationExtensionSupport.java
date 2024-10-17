@@ -15,7 +15,8 @@
  */
 package org.springframework.data.repository.config;
 
-import static org.springframework.beans.factory.support.BeanDefinitionReaderUtils.*;
+import static org.springframework.beans.factory.support.BeanDefinitionReaderUtils.GENERATED_BEAN_NAME_SEPARATOR;
+import static org.springframework.beans.factory.support.BeanDefinitionReaderUtils.generateBeanName;
 
 import java.lang.annotation.Annotation;
 import java.util.Collection;
