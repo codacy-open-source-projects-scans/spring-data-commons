@@ -33,7 +33,6 @@
 		<scala>2.11.7</scala>
 		<xmlbeam>1.4.26</xmlbeam>
 		<java-module-name>spring.data.commons</java-module-name>
-		<kotlin.api.target>1.8</kotlin.api.target>
 	</properties>
 
 	<dependencies>
@@ -387,6 +386,28 @@
 					</resource>
 				</resources>
 			</build>
+		</profile>
+		<profile>
+			<id>jmh</id>
+			<dependencies>
+				<dependency>
+					<groupId>org.openjdk.jmh</groupId>
+					<artifactId>jmh-core</artifactId>
+					<scope>test</scope>
+					<version>${jmh}</version>
+				</dependency>
+				<dependency>
+					<groupId>org.openjdk.jmh</groupId>
+					<artifactId>jmh-generator-annprocess</artifactId>
+					<scope>test</scope>
+				</dependency>
+			</dependencies>
+			<repositories>
+				<repository>
+					<id>jitpack.io</id>
+					<url>https://jitpack.io</url>
+				</repository>
+			</repositories>
 		</profile>
 	</profiles>
 
