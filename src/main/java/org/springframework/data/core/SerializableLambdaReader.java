@@ -49,7 +49,6 @@ import org.springframework.asm.SpringAsmInfo;
 import org.springframework.asm.Type;
 import org.springframework.core.KotlinDetector;
 import org.springframework.core.SpringProperties;
-import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.data.core.MemberDescriptor.KPropertyPathDescriptor;
 import org.springframework.data.core.MemberDescriptor.KPropertyReferenceDescriptor;
 import org.springframework.util.ClassUtils;
@@ -136,8 +135,8 @@ class SerializableLambdaReader {
 	 *
 	 * @param lambdaObject the actual lambda object, must be {@link java.io.Serializable}.
 	 * @return the member reference.
-	 * @throws InvalidDataAccessApiUsageException if the lambda object does not contain a valid property reference or hits
-	 *           any of the mentioned limitations.
+	 * @throws LambdaIntrospectionException if the lambda object does not contain a valid property reference or hits any
+	 *           of the mentioned limitations.
 	 */
 	public MemberDescriptor read(Object lambdaObject) {
 
@@ -171,10 +170,10 @@ class SerializableLambdaReader {
 				return getMemberDescriptor(lambdaObject, lambda);
 			}
 		} catch (ReflectiveOperationException | IOException e) {
-			throw new InvalidDataAccessApiUsageException("Cannot extract method or field", e);
+			throw new LambdaIntrospectionException("Cannot extract method or field", e);
 		}
 
-		throw new InvalidDataAccessApiUsageException("Cannot extract method or field from: " + lambdaObject
+		throw new LambdaIntrospectionException("Cannot extract method or field from: " + lambdaObject
 				+ ". The given value is not a lambda or method reference.");
 	}
 
@@ -183,7 +182,7 @@ class SerializableLambdaReader {
 		if (lambda.getImplMethodKind() == MethodHandleInfo.REF_newInvokeSpecial
 				|| lambda.getImplMethodKind() == MethodHandleInfo.REF_invokeSpecial) {
 
-			InvalidDataAccessApiUsageException e = new InvalidDataAccessApiUsageException(
+			LambdaIntrospectionException e = new LambdaIntrospectionException(
 					"Method reference must not be a constructor call");
 
 			if (filterStackTrace) {
@@ -223,7 +222,7 @@ class SerializableLambdaReader {
 			method.setAccessible(true);
 			return (SerializedLambda) method.invoke(lambda);
 		} catch (ReflectiveOperationException e) {
-			throw new InvalidDataAccessApiUsageException(
+			throw new LambdaIntrospectionException(
 					"Not a lambda: " + (lambda instanceof Enum<?> ? lambda.getClass().getName() + "#" + lambda : lambda), e);
 		}
 	}
@@ -297,7 +296,7 @@ class SerializableLambdaReader {
 				return KPropertyPathDescriptor.create(propRef);
 			}
 
-			throw new InvalidDataAccessApiUsageException("Cannot extract MemberDescriptor from: " + lambda);
+			throw new LambdaIntrospectionException("Cannot extract MemberDescriptor from: " + lambda);
 		}
 
 	}
@@ -467,7 +466,7 @@ class SerializableLambdaReader {
 			if (errors.isEmpty()) {
 
 				if (memberDescriptors.isEmpty()) {
-					throw new InvalidDataAccessApiUsageException("There is no method or field access");
+					throw new LambdaIntrospectionException("There is no method or field access");
 				}
 
 				return memberDescriptors.get(memberDescriptors.size() - 1);
@@ -478,7 +477,7 @@ class SerializableLambdaReader {
 
 				String methodName = getDeclaringMethodName(lambda);
 
-				InvalidDataAccessApiUsageException e = new InvalidDataAccessApiUsageException(
+				LambdaIntrospectionException e = new LambdaIntrospectionException(
 						"Cannot resolve property path%n%nError%s:%n".formatted(errors.size() > 1 ? "s" : "") + errors.stream()
 								.map(ReadingError::message).map(LambdaMethodVisitor::formatMessage).collect(Collectors.joining()));
 
@@ -498,7 +497,7 @@ class SerializableLambdaReader {
 				throw e;
 			}
 
-			throw new InvalidDataAccessApiUsageException("Error resolving " + errors);
+			throw new LambdaIntrospectionException("Error resolving " + errors);
 		}
 
 		private static String formatMessage(String args) {
