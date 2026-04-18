@@ -17,7 +17,10 @@ package org.springframework.data.aot;
 
 import static org.assertj.core.api.Assertions.*;
 
+import java.util.function.Predicate;
+
 import org.junit.jupiter.api.Test;
+
 import org.springframework.data.aot.types.*;
 import org.springframework.data.util.TypeCollector;
 
@@ -75,6 +78,25 @@ public class TypeCollectorUnitTests {
 				.inspect(it -> it.filterTypes(cls -> cls == EmptyType1.class || cls == TypesInMethodSignatures.class),
 						TypesInMethodSignatures.class)
 				.list()).containsOnly(TypesInMethodSignatures.class, EmptyType1.class);
+	}
+
+	@Test // GH-3474
+	void typeFilterStaticMatchesInspectWithSameCustomizer() {
+
+		Predicate<Class<?>> fromStatic = TypeCollector.create(tc -> {}).getTypeFilter();
+		TypeCollector collector = new TypeCollector();
+
+		assertThat(fromStatic.test(FieldsAndMethods.class))
+				.isEqualTo(collector.getTypeFilter().test(FieldsAndMethods.class));
+	}
+
+	@Test // GH-3474
+	void typeFilterReflectsAdditionalTypeFilters() {
+
+		Predicate<Class<?>> filter = TypeCollector.create(c -> c.filterTypes(cls -> false)).getTypeFilter();
+
+		assertThat(filter.test(FieldsAndMethods.class)).isFalse();
+		assertThat(TypeCollector.inspect(c -> c.filterTypes(cls -> false), FieldsAndMethods.class).list()).isEmpty();
 	}
 
 }

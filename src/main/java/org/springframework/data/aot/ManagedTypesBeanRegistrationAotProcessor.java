@@ -82,7 +82,9 @@ public class ManagedTypesBeanRegistrationAotProcessor implements BeanRegistratio
 			return null;
 		}
 
-		DefaultAotContext aotContext = new DefaultAotContext(registeredBean.getBeanFactory(), getConfiguredEnvironmentOrTryToResolveOne(registeredBean));
+		DefaultAotContext aotContext = new DefaultAotContext(registeredBean.getBeanFactory(),
+				getConfiguredEnvironmentOrTryToResolveOne(registeredBean),
+				new AotMappingContext(TypeCollector.create(typeCollectorCustomizer()).getTypeFilter()));
 		return contribute(aotContext, resolveManagedTypes(registeredBean), registeredBean);
 	}
 
