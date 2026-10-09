@@ -21,12 +21,14 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.ArgumentSet
 import org.junit.jupiter.params.provider.MethodSource
+import java.util.WeakHashMap
 import java.util.stream.Stream
 
 /**
  * Kotlin unit tests for [TypedPropertyPath] and related functionality.
  *
  * @author Mark Paluch
+ * @author Christoph Strobl
  */
 class TypedPropertyPathKtUnitTests {
 
@@ -37,6 +39,8 @@ class TypedPropertyPathKtUnitTests {
 	}
 
 	companion object {
+
+		private const val ITERATIONS = 10
 
 		@JvmStatic
 		fun propertyPaths(): Stream<ArgumentSet> {
@@ -81,6 +85,26 @@ class TypedPropertyPathKtUnitTests {
 		).isEqualTo("address")
 	}
 
+	@Test // GH-3521
+	fun shouldCacheSamPropertyReference() {
+
+		assertThat(TypedPropertyPath.path(Person::address))
+			.isSameAs(TypedPropertyPath.path(Person::address))
+		assertThat(TypedPropertyPath.of(Person::address))
+			.isSameAs(TypedPropertyPath.of(Person::address))
+	}
+
+	@Test // GH-3521
+	fun shouldCacheComposedKProperty() {
+
+		assertThat(TypedPropertyPath.path(Person::address / Address::city))
+			.isSameAs(TypedPropertyPath.path(Person::address / Address::city))
+		assertThat(TypedPropertyPath.of(Person::address / Address::city))
+			.isSameAs(TypedPropertyPath.of(Person::address / Address::city))
+		assertThat(TypedPropertyPath.path(Person::addresses / Address::city))
+			.isSameAs(TypedPropertyPath.path(Person::addresses / Address::city))
+	}
+
 	@Test // GH-3400
 	fun shouldSupportComposedPropertyReference() {
 
@@ -114,10 +138,74 @@ class TypedPropertyPathKtUnitTests {
 		assertThat(otherPath.toDotPath()).isEqualTo("address.city")
 	}
 
+	@Test // GH-3521
+	fun shouldCacheKotlinPropertyReference() {
+
+		clearPropertyPathCache();
+
+		repeat(ITERATIONS) {
+			PropertyPathUtil.resolve(asPropertyReference(Person::name))
+		}
+
+		assertThat(typedPropertyPathCacheSize()).isOne()
+	}
+
+	@Test // GH-3521
+	fun shouldCacheKotlinLambdaResolvedThroughPropertyPathUtil() {
+
+		clearPropertyPathCache();
+
+		repeat(ITERATIONS) {
+			PropertyPathUtil.resolve(PropertyReference<Person, String?> { it.name })
+		}
+
+		assertThat(typedPropertyPathCacheSize()).isOne()
+	}
+
+	@Test // GH-3521
+	fun shouldCacheKotlinPropertyReferenceResolvedDirectly() {
+
+		clearPropertyPathCache();
+
+		repeat(ITERATIONS) {
+			TypedPropertyPath.of(Person::age)
+		}
+
+		assertThat(typedPropertyPathCacheSize()).isOne()
+	}
+
+	private fun asPropertyReference(property: PropertyReference<Person, String?>) = property
+
+	private fun typedPropertyPathCacheSize(): Int {
+
+		val cache = obtainPropertyPathCache()
+
+		synchronized(cache) {
+			return cache.values.sumOf { it.size }
+		}
+	}
+
+	private fun clearPropertyPathCache() {
+
+		val cache = obtainPropertyPathCache()
+
+		synchronized(cache) {
+			return cache.clear()
+		}
+	}
+
+	@Suppress("UNCHECKED_CAST")
+	private fun obtainPropertyPathCache() : WeakHashMap<ClassLoader, Map<Any, Any>> {
+		val field = TypedPropertyPaths::class.java.getDeclaredField("resolved")
+		field.isAccessible = true
+		return field.get(null) as WeakHashMap<ClassLoader, Map<Any, Any>>
+	}
+
 	class Person {
 		var name: String? = null
 		var age: Int = 0
 		var address: Address? = null
+		var addresses: List<Address> = emptyList()
 		var emergencyContact: Person? = null
 	}
 

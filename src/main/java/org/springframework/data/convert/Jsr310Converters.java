@@ -29,11 +29,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-
-import org.jspecify.annotations.NonNull;
 
 import org.springframework.core.convert.converter.Converter;
 
@@ -45,6 +42,7 @@ import org.springframework.core.convert.converter.Converter;
  * @author Christoph Strobl
  * @author Jens Schauder
  * @author Mark Paluch
+ * @author Jan Durovec
  */
 public abstract class Jsr310Converters {
 
@@ -75,6 +73,8 @@ public abstract class Jsr310Converters {
 		converters.add(StringToDurationConverter.INSTANCE);
 		converters.add(PeriodToStringConverter.INSTANCE);
 		converters.add(StringToPeriodConverter.INSTANCE);
+		converters.add(StringToLocalTimeConverter.INSTANCE);
+		converters.add(LocalTimeToStringConverter.INSTANCE);
 		converters.add(StringToLocalDateConverter.INSTANCE);
 		converters.add(StringToLocalDateTimeConverter.INSTANCE);
 		converters.add(StringToInstantConverter.INSTANCE);
@@ -91,7 +91,7 @@ public abstract class Jsr310Converters {
 	 * @since 3.2
 	 */
 	public static Collection<Class<?>> getSupportedClasses() {
-		return Collections.unmodifiableList(CLASSES);
+		return CLASSES;
 	}
 
 	@ReadingConverter
@@ -99,7 +99,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public LocalDateTime convert(Date source) {
 			return ofInstant(source.toInstant(), systemDefault());
@@ -111,7 +110,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public Date convert(LocalDateTime source) {
 			return Date.from(source.atZone(systemDefault()).toInstant());
@@ -123,7 +121,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public LocalDate convert(Date source) {
 			return ofInstant(ofEpochMilli(source.getTime()), systemDefault()).toLocalDate();
@@ -135,7 +132,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public Date convert(LocalDate source) {
 			return Date.from(source.atStartOfDay(systemDefault()).toInstant());
@@ -147,7 +143,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public LocalTime convert(Date source) {
 			return ofInstant(ofEpochMilli(source.getTime()), systemDefault()).toLocalTime();
@@ -159,7 +154,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public Date convert(LocalTime source) {
 			return Date.from(source.atDate(LocalDate.now()).atZone(systemDefault()).toInstant());
@@ -171,7 +165,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public Instant convert(Date source) {
 			return source.toInstant();
@@ -183,7 +176,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public Date convert(Instant source) {
 			return Date.from(source);
@@ -195,7 +187,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public Instant convert(LocalDateTime source) {
 			return source.atZone(systemDefault()).toInstant();
@@ -207,7 +198,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public LocalDateTime convert(Instant source) {
 			return LocalDateTime.ofInstant(source, systemDefault());
@@ -219,7 +209,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public String convert(ZoneId source) {
 			return source.toString();
@@ -231,7 +220,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public ZoneId convert(String source) {
 			return ZoneId.of(source);
@@ -243,7 +231,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public String convert(Duration duration) {
 			return duration.toString();
@@ -255,7 +242,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public Duration convert(String s) {
 			return Duration.parse(s);
@@ -267,7 +253,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public String convert(Period period) {
 			return period.toString();
@@ -279,10 +264,37 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public Period convert(String s) {
 			return Period.parse(s);
+		}
+	}
+
+	/**
+	 * @since 4.1.2
+	 */
+	@ReadingConverter
+	public enum StringToLocalTimeConverter implements Converter<String, LocalTime> {
+
+		INSTANCE;
+
+		@Override
+		public LocalTime convert(String source) {
+			return LocalTime.parse(source);
+		}
+	}
+
+	/**
+	 * @since 4.1.2
+	 */
+	@ReadingConverter
+	public enum LocalTimeToStringConverter implements Converter<LocalTime, String> {
+
+		INSTANCE;
+
+		@Override
+		public String convert(LocalTime source) {
+			return source.toString();
 		}
 	}
 
@@ -291,7 +303,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public LocalDate convert(String source) {
 			return LocalDate.parse(source, DateTimeFormatter.ISO_DATE);
@@ -303,7 +314,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public LocalDateTime convert(String source) {
 			return LocalDateTime.parse(source, DateTimeFormatter.ISO_DATE_TIME);
@@ -315,7 +325,6 @@ public abstract class Jsr310Converters {
 
 		INSTANCE;
 
-		@NonNull
 		@Override
 		public Instant convert(String source) {
 			return Instant.parse(source);

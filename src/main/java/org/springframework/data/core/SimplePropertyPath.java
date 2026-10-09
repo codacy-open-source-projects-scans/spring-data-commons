@@ -44,6 +44,7 @@ import org.springframework.util.StringUtils;
 class SimplePropertyPath implements PropertyPath {
 
 	private static final String PARSE_DEPTH_EXCEEDED = "Trying to parse a path with depth greater than 1000; This has been disabled for security reasons to prevent parsing overflows";
+	private static final int MAX_PARSE_DEPTH = 1000;
 
 	private static final String DELIMITERS = "_\\.";
 	private static final Pattern SPLITTER = Pattern.compile("(?:[%s]?([%s]*?[^%s]+))".replaceAll("%s", DELIMITERS));
@@ -144,6 +145,11 @@ class SimplePropertyPath implements PropertyPath {
 	}
 
 	@Override
+	public SimplePropertyPath getLeafProperty() {
+		return (SimplePropertyPath) PropertyPath.super.getLeafProperty();
+	}
+
+	@Override
 	public boolean isCollection() {
 		return isCollection;
 	}
@@ -232,7 +238,11 @@ class SimplePropertyPath implements PropertyPath {
 					: SPLITTER.matcher("_" + it.path);
 
 			while (matcher.find()) {
+
 				iteratorSource.add(matcher.group(1));
+				if(iteratorSource.size() > MAX_PARSE_DEPTH) {
+					throw new IllegalArgumentException(PARSE_DEPTH_EXCEEDED);
+				}
 			}
 
 			Iterator<String> parts = iteratorSource.iterator();
@@ -264,6 +274,10 @@ class SimplePropertyPath implements PropertyPath {
 
 	/**
 	 * Creates a new {@link SimplePropertyPath} as subordinary of the given {@link SimplePropertyPath}.
+	 * <p>
+	 * {@code base} holds one entry per part of the path, namely the part's first property. A part spelled in camel case
+	 * stands for a chain of properties rather than a single one, so what the next part continues from is that entry's
+	 * {@link #getLeafProperty()}  leaf}, not the entry itself.
 	 *
 	 * @param source
 	 * @param base
@@ -271,11 +285,9 @@ class SimplePropertyPath implements PropertyPath {
 	 */
 	private static SimplePropertyPath create(String source, Stack<SimplePropertyPath> base) {
 
-		SimplePropertyPath previous = base.peek();
+		SimplePropertyPath previous = base.peek().getLeafProperty();
 
-		SimplePropertyPath propertyPath = create(source, previous.typeInformation.getRequiredActualType(), base);
-		previous.next = propertyPath;
-		return propertyPath;
+		return create(source, previous.typeInformation.getRequiredActualType(), base);
 	}
 
 	/**
@@ -289,7 +301,7 @@ class SimplePropertyPath implements PropertyPath {
 	 * @return
 	 */
 	private static SimplePropertyPath create(String source, TypeInformation<?> type, List<SimplePropertyPath> base) {
-		return create(source, type, "", base);
+		return create(source, type, "", base, MAX_PARSE_DEPTH - base.size());
 	}
 
 	/**
@@ -303,9 +315,9 @@ class SimplePropertyPath implements PropertyPath {
 	 * @return
 	 */
 	private static SimplePropertyPath create(String source, TypeInformation<?> type, String addTail,
-			List<SimplePropertyPath> base) {
+			List<SimplePropertyPath> base, int remainingDepth) {
 
-		if (base.size() > 1000) {
+		if (base.size() > MAX_PARSE_DEPTH || remainingDepth <= 0) {
 			throw new IllegalArgumentException(PARSE_DEPTH_EXCEEDED);
 		}
 
@@ -317,7 +329,7 @@ class SimplePropertyPath implements PropertyPath {
 			current = new SimplePropertyPath(source, type, base);
 
 			if (!base.isEmpty()) {
-				base.get(base.size() - 1).next = current;
+				base.get(base.size() - 1).getLeafProperty().next = current;
 			}
 
 			List<SimplePropertyPath> newBase = new ArrayList<>(base);
@@ -347,7 +359,7 @@ class SimplePropertyPath implements PropertyPath {
 			String tail = source.substring(position);
 
 			try {
-				return create(head, type, tail + addTail, base);
+				return create(head, type, tail + addTail, base, remainingDepth - 1);
 			} catch (PropertyReferenceException e) {
 				throw e.hasDeeperResolutionDepthThan(exception) ? e : exception;
 			}

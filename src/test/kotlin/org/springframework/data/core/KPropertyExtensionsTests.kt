@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.ArgumentSet
 import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
+import org.springframework.data.mapping.div as mappingDiv
 
 /**
  * Unit tests for [kotlin.reflect.KProperty] extensions.
@@ -78,6 +79,48 @@ class KPropertyExtensionsTests {
 		val property = (Book::author / Author::name).toDotPath()
 
 		assertThat(property).isEqualTo("author.name")
+	}
+
+	@Test // GH-3503
+	fun `Convert legacy nested KProperty to field name`() {
+
+		val property = Book::author.mappingDiv(Author::name).toDotPath()
+
+		assertThat(property).isEqualTo("author.name")
+	}
+
+	@Test // GH-3503
+	fun `Convert legacy Iterable nested KProperty to field name`() {
+
+		val property = Author::books.mappingDiv(Book::title).toDotPath()
+
+		assertThat(property).isEqualTo("books.title")
+	}
+
+	@Test // GH-3503
+	fun `Convert nested KProperty in leaf position to field name`() {
+
+		val property = (Book::author / (Author::books / Book::title)).toDotPath()
+
+		assertThat(property).isEqualTo("author.books.title")
+	}
+
+	@Test // GH-3503
+	fun `Convert legacy nested KProperty with nested leaf to field name`() {
+
+		val property = Book::author.mappingDiv(Author::books / Book::title).toDotPath()
+
+		assertThat(property).isEqualTo("author.books.title")
+	}
+
+	@Test // GH-3503
+	fun `Convert legacy nested KProperty with nested parent to field name`() {
+
+		class Entity(val book: Book)
+
+		val property = (Entity::book / Book::author).mappingDiv(Author::name).toDotPath()
+
+		assertThat(property).isEqualTo("book.author.name")
 	}
 
 	@Test // GH-3010
@@ -148,6 +191,24 @@ class KPropertyExtensionsTests {
 		assertThat(property).isEqualTo("author.name")
 	}
 
+	@Test // GH-3521
+	fun `Nested KProperty should be equal`() {
+
+		assertThat(Book::author / Author::name).isEqualTo(Book::author / Author::name)
+			.hasSameHashCodeAs(Book::author / Author::name)
+		assertThat(Book::author / Author::name).isNotEqualTo(Book::author / Author::books)
+		assertThat(Book::author / Author::name).isNotEqualTo(Book::editor / Author::name)
+	}
+
+	@Test // GH-3521
+	fun `Iterable nested KProperty should be equal`() {
+
+		assertThat(Author::books / Book::title).isEqualTo(Author::books / Book::title)
+			.hasSameHashCodeAs(Author::books / Book::title)
+		assertThat(Author::books / Book::title).isNotEqualTo(Author::books / Book::author)
+		assertThat(Author::books / Book::title).isNotEqualTo(Author::favorites / Book::title)
+	}
+
 	@Test // DATACMNS-1835
 	fun `Convert nullable KProperty to field name`() {
 
@@ -158,8 +219,12 @@ class KPropertyExtensionsTests {
 		assertThat(property).isEqualTo("cat.name")
 	}
 
-	class Book(val title: String, val author: Author)
-	class Author(val name: String, val books: List<Book>)
+	class Book(val title: String, val author: Author, val editor: Author = author)
+	class Author(
+		val name: String,
+		val books: List<Book>,
+		val favorites: List<Book> = books
+	)
 
 	class Person {
 		var name: String? = null

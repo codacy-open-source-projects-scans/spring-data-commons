@@ -16,25 +16,18 @@
 package org.springframework.data.web;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 import example.ProjectedPayloadMarkedSampleInterface;
 import example.SampleInterface;
 
 import java.lang.reflect.Method;
 import java.util.List;
-import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.convert.support.DefaultConversionService;
-import org.springframework.core.log.LogAccessor;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.util.ReflectionUtils;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -87,7 +80,7 @@ class ProxyingHandlerMethodArgumentResolverUnitTests {
 	@Test // DATACMNS-776
 	void doesNotSupportCoreJavaType() {
 
-		var parameter = getParameter("with", List.class);
+		var parameter = getParameter("with");
 
 		assertThat(resolver.supportsParameter(parameter)).isFalse();
 	}
@@ -95,7 +88,7 @@ class ProxyingHandlerMethodArgumentResolverUnitTests {
 	@Test // GH-2937
 	void doesNotSupportForeignSpringAnnotations() {
 
-		var parameter = getParameter("withForeignAnnotation", SampleInterface.class);
+		var parameter = getParameter("withForeignAnnotation");
 
 		assertThat(resolver.supportsParameter(parameter)).isFalse();
 	}
@@ -103,7 +96,7 @@ class ProxyingHandlerMethodArgumentResolverUnitTests {
 	@Test // GH-3301
 	void doesNotSupportAtModelAttribute() {
 
-		var parameter = getParameter("withModelAttribute", SampleInterface.class);
+		var parameter = getParameter("withModelAttribute");
 
 		assertThat(resolver.supportsParameter(parameter)).isFalse();
 	}
@@ -111,15 +104,15 @@ class ProxyingHandlerMethodArgumentResolverUnitTests {
 	@Test // GH-3258
 	void doesNotSupportAtModelAttributeForMultipartParam() {
 
-		var parameter = getParameter("withModelAttributeMultipart", MultipartFile.class);
+		var parameter = getParameter("withModelAttributeMultipart");
 
 		assertThat(resolver.supportsParameter(parameter)).isFalse();
 	}
 
 	@Test // GH-3258
-	void doesSupportAtProjectedPayload() {
+	void supportsAtProjectedPayload() {
 
-		var parameter = getParameter("withProjectedPayload", SampleInterface.class);
+		var parameter = getParameter("withProjectedPayload");
 
 		assertThat(resolver.supportsParameter(parameter)).isTrue();
 	}
@@ -127,50 +120,9 @@ class ProxyingHandlerMethodArgumentResolverUnitTests {
 	@Test // GH-3258
 	void doesNotSupportAtProjectedPayloadForMultipartParam() {
 
-		var parameter = getParameter("withProjectedPayloadMultipart", MultipartFile.class);
+		var parameter = getParameter("withProjectedPayloadMultipart");
 
 		assertThat(resolver.supportsParameter(parameter)).isFalse();
-	}
-
-	@ParameterizedTest // GH-3300
-	@ValueSource(strings = { "withModelAttribute", "withUserUnannotatedInterface" })
-	@SuppressWarnings("unchecked")
-	void deprecationLoggerOnlyLogsOncePerParameter(String methodName) {
-
-		var parameter = getParameter(methodName);
-
-		// Spy on the actual logger
-		var actualLoggerSpy = spy(new LogAccessor(ProxyingHandlerMethodArgumentResolver.class));
-		ReflectionTestUtils.setField(ProxyingHandlerMethodArgumentResolver.class, "LOGGER", actualLoggerSpy,
-				LogAccessor.class);
-
-		// Invoke twice but should only log the first time
-		assertThat(resolver.supportsParameter(parameter)).isFalse();
-		verify(actualLoggerSpy, times(1)).warn(any(Supplier.class));
-		assertThat(resolver.supportsParameter(parameter)).isFalse();
-		verifyNoMoreInteractions(actualLoggerSpy);
-	}
-
-	@ParameterizedTest // GH-3300
-	@ValueSource(strings = { "withProjectedPayload", "withSpringAnnotatedInterface", "withUserAnnotatedInterface" })
-	void shouldNotLogDeprecationForValidUsage(String methodName) {
-
-		var parameter = getParameter(methodName);
-
-		// Spy on the actual logger
-		var actualLoggerSpy = spy(new LogAccessor(ProxyingHandlerMethodArgumentResolver.class));
-		ReflectionTestUtils.setField(ProxyingHandlerMethodArgumentResolver.class, "LOGGER", actualLoggerSpy,
-				LogAccessor.class);
-
-		// Invoke should not log
-		assertThat(resolver.supportsParameter(parameter)).isTrue();
-		verifyNoInteractions(actualLoggerSpy);
-	}
-
-	private static MethodParameter getParameter(String methodName, Class<?> parameterType) {
-
-		var method = ReflectionUtils.findMethod(Controller.class, methodName, parameterType);
-		return new MethodParameter(method, 0);
 	}
 
 	private static MethodParameter getParameter(String methodName) {
